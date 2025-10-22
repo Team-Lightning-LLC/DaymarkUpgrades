@@ -391,44 +391,45 @@ class DeepResearchApp {
     docsPane.innerHTML = html;
   }
 
-  // View document
-  async viewDocument(docId) {
-    try {
-      const doc = this.documents.find(d => d.id === docId);
-      if (!doc) return;
-      
-      const downloadResponse = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/download-url`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          file: doc.content_source,
-          format: 'original'
-        })
-      });
-      
-      if (!downloadResponse.ok) {
-        throw new Error(`Failed to get download URL: ${downloadResponse.statusText}`);
-      }
-      
-      const downloadData = await downloadResponse.json();
-      
-      const contentResponse = await fetch(downloadData.url);
-      if (!contentResponse.ok) {
-        throw new Error(`Failed to download content: ${contentResponse.statusText}`);
-      }
-      
-      const content = await contentResponse.text();
-      
-      markdownViewer.openViewer(content, doc.title);
-      
-    } catch (error) {
-      console.error('Failed to view document:', error);
-      alert('Failed to load document. Please try again.');
+// View document
+async viewDocument(docId) {
+  try {
+    const doc = this.documents.find(d => d.id === docId);
+    if (!doc) return;
+    
+    const downloadResponse = await fetch(`${CONFIG.VERTESIA_API_BASE}/objects/download-url`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CONFIG.VERTESIA_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ 
+        file: doc.content_source,
+        format: 'original'
+      })
+    });
+    
+    if (!downloadResponse.ok) {
+      throw new Error(`Failed to get download URL: ${downloadResponse.statusText}`);
     }
+    
+    const downloadData = await downloadResponse.json();
+    
+    const contentResponse = await fetch(downloadData.url);
+    if (!contentResponse.ok) {
+      throw new Error(`Failed to download content: ${contentResponse.statusText}`);
+    }
+    
+    const content = await contentResponse.text();
+    
+    // Pass docId to viewer
+    markdownViewer.openViewer(content, doc.title, docId);  // <-- Added docId
+    
+  } catch (error) {
+    console.error('Failed to view document:', error);
+    alert('Failed to load document. Please try again.');
   }
+}
 
   // Download document as PDF
   async downloadDocument(docId) {
