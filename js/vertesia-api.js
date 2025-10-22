@@ -144,7 +144,7 @@ async chatWithDocument(data) {
     method: 'POST',
     body: JSON.stringify({
       type: 'conversation',
-      interaction: 'DocumentChat',
+      interaction: 'Documentchat',
       data: {
         Task: prompt
       },
