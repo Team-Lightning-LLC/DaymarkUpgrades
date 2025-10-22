@@ -125,7 +125,7 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
-  // Chat with document (includes conversation history)
+  // Chat with document - Async execution with conversation history
   async chatWithDocument(data) {
     return await this.call('/execute/async', {
       method: 'POST',
@@ -147,12 +147,12 @@ class VertesiaAPI {
 
   // Get chat job status
   async getChatJobStatus(runId) {
-    return await this.call(`/jobs/${runId}`);
+    return await this.call(`/runs/${runId}`);
   }
 
   // Get chat job result
   async getChatJobResult(runId) {
-    return await this.call(`/jobs/${runId}/result`);
+    return await this.call(`/runs/${runId}/result`);
   }
 }
 
