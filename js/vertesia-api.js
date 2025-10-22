@@ -125,44 +125,48 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
-  // Start a new conversation with a document
-  async startDocumentConversation(data) {
-    return await this.call('/execute/async', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'conversation',
-        interaction: 'DocumentChat',
-        data: {
-          document_id: data.document_id,
-          question: data.question
-        },
-        config: {
-          environment: CONFIG.ENVIRONMENT_ID,
-          model: CONFIG.MODEL
-        },
-        visibility: 'private',
-        interactive: false
-      })
-    });
-  }
+// Start a new conversation with a document
+async startDocumentConversation(data) {
+  // Build the task prompt
+  const task = `Document ID: ${data.document_id}\n\nQuestion: ${data.question}`;
+  
+  return await this.call('/execute/async', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'conversation',
+      interaction: 'DocumentChat',
+      data: {
+        task: task  // Capital T, just like research generation
+      },
+      config: {
+        environment: CONFIG.ENVIRONMENT_ID,
+        model: CONFIG.MODEL
+      },
+      visibility: 'private',
+      interactive: false
+    })
+  });
+}
 
-  // Continue existing conversation
-  async continueDocumentConversation(conversationId, question) {
-    return await this.call('/execute/async', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'conversation',
-        conversation_id: conversationId,
-        data: {
-          question: question
-        },
-        config: {
-          environment: CONFIG.ENVIRONMENT_ID,
-          model: CONFIG.MODEL
-        }
-      })
-    });
-  }
+// Continue existing conversation
+async continueDocumentConversation(conversationId, question) {
+  const task = `Question: ${question}`;
+  
+  return await this.call('/execute/async', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'conversation',
+      conversation_id: conversationId,
+      data: {
+        task: task  // Capital T
+      },
+      config: {
+        environment: CONFIG.ENVIRONMENT_ID,
+        model: CONFIG.MODEL
+      }
+    })
+  });
+}
 
   // Get chat job status
   async getChatJobStatus(runId) {
