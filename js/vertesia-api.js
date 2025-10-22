@@ -125,36 +125,17 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
-  // Start a new conversation with a document
-  async startDocumentConversation(data) {
+  // Chat with document (includes conversation history)
+  async chatWithDocument(data) {
     return await this.call('/execute/async', {
       method: 'POST',
       body: JSON.stringify({
-        type: 'conversation',
+        type: 'interaction',
         interaction: 'DocumentChat',
         data: {
           document_id: data.document_id,
-          question: data.question
-        },
-        config: {
-          environment: CONFIG.ENVIRONMENT_ID,
-          model: CONFIG.MODEL
-        },
-        visibility: 'private',
-        interactive: false
-      })
-    });
-  }
-
-  // Continue existing conversation
-  async continueDocumentConversation(conversationId, question) {
-    return await this.call('/execute/async', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'conversation',
-        conversation_id: conversationId,
-        data: {
-          question: question
+          question: data.question,
+          conversation_history: data.conversation_history || []
         },
         config: {
           environment: CONFIG.ENVIRONMENT_ID,
@@ -166,12 +147,12 @@ class VertesiaAPI {
 
   // Get chat job status
   async getChatJobStatus(runId) {
-    return await this.call(`/runs/${runId}`);
+    return await this.call(`/jobs/${runId}`);
   }
 
   // Get chat job result
   async getChatJobResult(runId) {
-    return await this.call(`/runs/${runId}/result`);
+    return await this.call(`/jobs/${runId}/result`);
   }
 }
 
