@@ -164,16 +164,45 @@
   </div>
 </div>
 
-<!-- Document Viewer Modal -->
+<!-- Document Viewer Modal with Chat -->
 <dialog id="viewer" aria-label="Document viewer">
   <div class="viewer-head">
     <div class="viewer-title" id="viewerTitle">Document</div>
     <div class="viewer-actions">
       <button type="button" class="viewer-btn" id="downloadPDF">Download PDF</button>
+      <button type="button" class="viewer-btn" id="chatToggle">Chat</button>
       <button type="button" class="viewer-close" id="closeViewer">Close</button>
     </div>
   </div>
-  <div id="viewerFrame" class="viewer-content"></div>
+  
+  <div class="viewer-container">
+    <!-- Document Content (Left Side) -->
+    <div id="viewerFrame" class="viewer-content"></div>
+    
+    <!-- Chat Panel (Right Side - Hidden by Default) -->
+    <div id="chatPanel" class="chat-panel">
+      <div class="chat-panel-header">
+        <div class="chat-panel-title">Chat with Document</div>
+        <div class="chat-panel-subtitle" id="chatDocTitle">Document Name</div>
+      </div>
+      
+      <div class="chat-messages" id="chatMessages">
+        <!-- Messages populated dynamically -->
+      </div>
+      
+      <div class="chat-input-container">
+        <textarea 
+          id="chatInput" 
+          rows="2" 
+          placeholder="Ask a question about this document..."></textarea>
+        <button id="chatSend" class="chat-send-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
 </dialog>
 
 <!-- Application Scripts -->
