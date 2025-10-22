@@ -111,7 +111,7 @@ class VertesiaAPI {
       name: title,
       description: `Research document: ${title}`,
       content: {
-        source: content, // Store markdown directly as text
+        source: content,
         type: 'text/markdown',
         name: title
       },
@@ -123,6 +123,55 @@ class VertesiaAPI {
     };
 
     return await this.createObject(objectData);
+  }
+
+  // Start a new conversation with a document
+  async startDocumentConversation(data) {
+    return await this.call('/execute/async', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'conversation',
+        interaction: 'DocumentChat',
+        data: {
+          document_id: data.document_id,
+          question: data.question
+        },
+        config: {
+          environment: CONFIG.ENVIRONMENT_ID,
+          model: CONFIG.MODEL
+        },
+        visibility: 'private',
+        interactive: false
+      })
+    });
+  }
+
+  // Continue existing conversation
+  async continueDocumentConversation(conversationId, question) {
+    return await this.call('/execute/async', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'conversation',
+        conversation_id: conversationId,
+        data: {
+          question: question
+        },
+        config: {
+          environment: CONFIG.ENVIRONMENT_ID,
+          model: CONFIG.MODEL
+        }
+      })
+    });
+  }
+
+  // Get chat job status
+  async getChatJobStatus(runId) {
+    return await this.call(`/runs/${runId}`);
+  }
+
+  // Get chat job result
+  async getChatJobResult(runId) {
+    return await this.call(`/runs/${runId}/result`);
   }
 }
 
