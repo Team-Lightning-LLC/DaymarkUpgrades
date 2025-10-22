@@ -4,8 +4,11 @@ class MarkdownViewer {
     this.currentContent = '';
     this.currentTitle = '';
     this.currentDocId = null;
+    this.conversationId = null;
     this.chatOpen = false;
     this.chatMessages = [];
+    this.activeChatJob = null;
+    this.chatPollTimer = null;
     this.setupEventListeners();
   }
 
@@ -65,6 +68,7 @@ class MarkdownViewer {
     this.currentContent = markdownContent;
     this.currentTitle = title;
     this.currentDocId = docId;
+    this.conversationId = null;
     this.chatMessages = [];
     this.chatOpen = false;
 
@@ -151,8 +155,9 @@ class MarkdownViewer {
   }
 
   // Send chat message
-  sendMessage() {
+  async sendMessage() {
     const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
     if (!chatInput) return;
     
     const message = chatInput.value.trim();
@@ -161,14 +166,161 @@ class MarkdownViewer {
     // Add user message
     this.addMessage('user', message);
     
-    // Clear input
+    // Clear input and disable
     chatInput.value = '';
+    chatInput.disabled = true;
+    if (chatSend) chatSend.disabled = true;
     
-    // TODO: Send to API and get response
-    // For now, show a placeholder response
-    setTimeout(() => {
-      this.addMessage('assistant', 'Chat API not connected yet. Your message: "' + message + '"');
-    }, 500);
+    // Add thinking indicator
+    this.addThinkingMessage();
+    
+    try {
+      let jobResponse;
+      
+      if (!this.conversationId) {
+        // First message - start new conversation
+        console.log('Starting new conversation for document:', this.currentDocId);
+        jobResponse = await vertesiaAPI.startDocumentConversation({
+          document_id: this.currentDocId,
+          question: message
+        });
+        
+        // Store conversation ID (might be in different fields depending on API response)
+        this.conversationId = jobResponse.conversationId || jobResponse.workflowId || jobResponse.id;
+        console.log('Conversation started:', this.conversationId);
+        
+      } else {
+        // Continue existing conversation
+        console.log('Continuing conversation:', this.conversationId);
+        jobResponse = await vertesiaAPI.continueDocumentConversation(
+          this.conversationId,
+          message
+        );
+      }
+      
+      this.activeChatJob = {
+        runId: jobResponse.runId,
+        startTime: Date.now()
+      };
+      
+      // Start polling for result
+      this.startChatPolling();
+      
+    } catch (error) {
+      console.error('Chat error:', error);
+      this.removeThinkingMessage();
+      this.addMessage('assistant', 'Sorry, there was an error processing your question.');
+      
+      // Re-enable input
+      chatInput.disabled = false;
+      if (chatSend) chatSend.disabled = false;
+      chatInput.focus();
+    }
+  }
+
+  // Add thinking indicator
+  addThinkingMessage() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    const thinkingDiv = document.createElement('div');
+    thinkingDiv.className = 'chat-message assistant thinking';
+    thinkingDiv.id = 'thinking-indicator';
+    thinkingDiv.innerHTML = `
+      <div class="chat-message-bubble">
+        <div class="thinking-dots">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    `;
+    
+    chatMessages.appendChild(thinkingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  // Remove thinking indicator
+  removeThinkingMessage() {
+    const thinking = document.getElementById('thinking-indicator');
+    if (thinking) thinking.remove();
+  }
+
+  // Start polling for chat result
+  startChatPolling() {
+    let pollCount = 0;
+    const maxPolls = 30; // 30 polls * 2 seconds = 60 seconds max
+    
+    this.chatPollTimer = setInterval(async () => {
+      pollCount++;
+      
+      try {
+        const status = await vertesiaAPI.getChatJobStatus(this.activeChatJob.runId);
+        
+        if (status.status === 'completed' || status.status === 'success') {
+          // Get result
+          const result = await vertesiaAPI.getChatJobResult(this.activeChatJob.runId);
+          
+          this.removeThinkingMessage();
+          
+          // Try different possible response field names
+          const answer = result.answer || result.output || result.result || result.response || 'Response received.';
+          this.addMessage('assistant', answer);
+          
+          this.stopChatPolling();
+          this.reEnableInput();
+          
+        } else if (status.status === 'failed' || status.status === 'error') {
+          this.removeThinkingMessage();
+          this.addMessage('assistant', 'Sorry, there was an error generating the response.');
+          
+          this.stopChatPolling();
+          this.reEnableInput();
+        }
+        
+        // Timeout after max polls
+        if (pollCount >= maxPolls) {
+          this.removeThinkingMessage();
+          this.addMessage('assistant', 'Request timed out. Please try again.');
+          
+          this.stopChatPolling();
+          this.reEnableInput();
+        }
+        
+      } catch (error) {
+        console.error('Polling error:', error);
+        
+        // Continue polling unless we hit max
+        if (pollCount >= maxPolls) {
+          this.removeThinkingMessage();
+          this.addMessage('assistant', 'Error checking response status.');
+          
+          this.stopChatPolling();
+          this.reEnableInput();
+        }
+      }
+    }, 2000); // Poll every 2 seconds
+  }
+
+  // Stop chat polling
+  stopChatPolling() {
+    if (this.chatPollTimer) {
+      clearInterval(this.chatPollTimer);
+      this.chatPollTimer = null;
+    }
+    this.activeChatJob = null;
+  }
+
+  // Re-enable input
+  reEnableInput() {
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
+    
+    if (chatInput) {
+      chatInput.disabled = false;
+      chatInput.focus();
+    }
+    if (chatSend) {
+      chatSend.disabled = false;
+    }
   }
 
   // Add message to chat
@@ -205,6 +357,9 @@ class MarkdownViewer {
     const container = document.querySelector('.viewer-container');
     const chatToggle = document.getElementById('chatToggle');
     
+    // Stop any active polling
+    this.stopChatPolling();
+    
     // Reset content
     if (viewerFrame) {
       viewerFrame.innerHTML = '';
@@ -221,6 +376,7 @@ class MarkdownViewer {
     
     this.chatOpen = false;
     this.chatMessages = [];
+    this.conversationId = null;
 
     // Close dialog
     if (dialog?.open) {
@@ -243,7 +399,7 @@ class MarkdownViewer {
     await this.generatePDFFromContent(this.currentContent, this.currentTitle);
   }
 
-  // Generate PDF from content (existing method)
+  // Generate PDF from content
   async generatePDFFromContent(content, title) {
     if (!window.html2pdf) {
       console.error('html2pdf library not loaded');
@@ -279,7 +435,7 @@ class MarkdownViewer {
     }
   }
 
-  // Apply inline styles for PDF generation (existing method)
+  // Apply inline styles for PDF generation
   applyInlineStyles(container) {
     container.style.cssText = `
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
