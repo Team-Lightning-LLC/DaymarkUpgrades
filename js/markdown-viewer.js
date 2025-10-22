@@ -1,8 +1,11 @@
-// Markdown Document Viewer and PDF Generator
+// Markdown Document Viewer and PDF Generator with Chat
 class MarkdownViewer {
   constructor() {
     this.currentContent = '';
     this.currentTitle = '';
+    this.currentDocId = null;
+    this.chatOpen = false;
+    this.chatMessages = [];
     this.setupEventListeners();
   }
 
@@ -15,6 +18,24 @@ class MarkdownViewer {
     // Download PDF
     document.getElementById('downloadPDF')?.addEventListener('click', () => {
       this.generatePDF();
+    });
+
+    // Toggle chat
+    document.getElementById('chatToggle')?.addEventListener('click', () => {
+      this.toggleChat();
+    });
+
+    // Send chat message
+    document.getElementById('chatSend')?.addEventListener('click', () => {
+      this.sendMessage();
+    });
+
+    // Enter to send (Shift+Enter for new line)
+    document.getElementById('chatInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.sendMessage();
+      }
     });
 
     // Click outside to close
@@ -35,7 +56,7 @@ class MarkdownViewer {
   }
 
   // Open formatted markdown viewer
-  openViewer(markdownContent, title) {
+  openViewer(markdownContent, title, docId) {
     if (!marked || typeof marked.parse !== 'function') {
       console.error('Marked.js library not loaded');
       return;
@@ -43,14 +64,27 @@ class MarkdownViewer {
 
     this.currentContent = markdownContent;
     this.currentTitle = title;
+    this.currentDocId = docId;
+    this.chatMessages = [];
+    this.chatOpen = false;
 
     const dialog = document.getElementById('viewer');
     const titleElement = document.getElementById('viewerTitle');
     const viewerFrame = document.getElementById('viewerFrame');
+    const container = document.querySelector('.viewer-container');
+    const chatToggle = document.getElementById('chatToggle');
 
     // Set title
     if (titleElement) {
       titleElement.textContent = title || 'Research Document';
+    }
+
+    // Reset chat state
+    if (container) {
+      container.classList.remove('chat-open');
+    }
+    if (chatToggle) {
+      chatToggle.classList.remove('active');
     }
 
     try {
@@ -70,16 +104,123 @@ class MarkdownViewer {
     }
   }
 
+  // Toggle chat panel
+  toggleChat() {
+    this.chatOpen = !this.chatOpen;
+    
+    const container = document.querySelector('.viewer-container');
+    const chatToggle = document.getElementById('chatToggle');
+    const chatDocTitle = document.getElementById('chatDocTitle');
+    const chatMessages = document.getElementById('chatMessages');
+    
+    if (this.chatOpen) {
+      container?.classList.add('chat-open');
+      chatToggle?.classList.add('active');
+      
+      // Update chat title
+      if (chatDocTitle) {
+        chatDocTitle.textContent = this.currentTitle;
+      }
+      
+      // Show empty state if no messages
+      if (this.chatMessages.length === 0) {
+        this.showChatEmptyState();
+      } else {
+        this.renderChatMessages();
+      }
+      
+    } else {
+      container?.classList.remove('chat-open');
+      chatToggle?.classList.remove('active');
+    }
+  }
+
+  // Show empty state in chat
+  showChatEmptyState() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    chatMessages.innerHTML = `
+      <div class="chat-empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        <p>Ask questions about this document to get deeper insights</p>
+      </div>
+    `;
+  }
+
+  // Send chat message
+  sendMessage() {
+    const chatInput = document.getElementById('chatInput');
+    if (!chatInput) return;
+    
+    const message = chatInput.value.trim();
+    if (!message) return;
+    
+    // Add user message
+    this.addMessage('user', message);
+    
+    // Clear input
+    chatInput.value = '';
+    
+    // TODO: Send to API and get response
+    // For now, show a placeholder response
+    setTimeout(() => {
+      this.addMessage('assistant', 'Chat API not connected yet. Your message: "' + message + '"');
+    }, 500);
+  }
+
+  // Add message to chat
+  addMessage(role, content) {
+    const timestamp = new Date().toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit' 
+    });
+    
+    this.chatMessages.push({ role, content, timestamp });
+    this.renderChatMessages();
+  }
+
+  // Render all chat messages
+  renderChatMessages() {
+    const chatMessages = document.getElementById('chatMessages');
+    if (!chatMessages) return;
+    
+    chatMessages.innerHTML = this.chatMessages.map(msg => `
+      <div class="chat-message ${msg.role}">
+        <div class="chat-message-bubble">${msg.content}</div>
+        <div class="chat-message-time">${msg.timestamp}</div>
+      </div>
+    `).join('');
+    
+    // Scroll to bottom
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
   // Close viewer and reset
   closeViewer() {
     const dialog = document.getElementById('viewer');
     const viewerFrame = document.getElementById('viewerFrame');
+    const container = document.querySelector('.viewer-container');
+    const chatToggle = document.getElementById('chatToggle');
     
     // Reset content
     if (viewerFrame) {
       viewerFrame.innerHTML = '';
       viewerFrame.className = 'viewer-content';
     }
+
+    // Reset chat state
+    if (container) {
+      container.classList.remove('chat-open');
+    }
+    if (chatToggle) {
+      chatToggle.classList.remove('active');
+    }
+    
+    this.chatOpen = false;
+    this.chatMessages = [];
 
     // Close dialog
     if (dialog?.open) {
@@ -89,6 +230,7 @@ class MarkdownViewer {
     // Clear current content
     this.currentContent = '';
     this.currentTitle = '';
+    this.currentDocId = null;
   }
 
   // Generate PDF from current content
@@ -98,29 +240,28 @@ class MarkdownViewer {
       return;
     }
 
+    await this.generatePDFFromContent(this.currentContent, this.currentTitle);
+  }
+
+  // Generate PDF from content (existing method)
+  async generatePDFFromContent(content, title) {
     if (!window.html2pdf) {
       console.error('html2pdf library not loaded');
       return;
     }
 
     try {
-      // Convert markdown to HTML
-      const htmlContent = marked.parse(this.currentContent);
+      const htmlContent = marked.parse(content);
       
-      // Create temporary container
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = htmlContent;
       
-      // Apply inline styles for PDF
       this.applyInlineStyles(tempDiv);
       
-      // Add to DOM temporarily
       document.body.appendChild(tempDiv);
       
-      // Generate filename
-      const filename = `${this.currentTitle.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      const filename = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       
-      // Configure PDF options
       const pdfOptions = {
         margin: 0.5,
         filename: filename,
@@ -129,10 +270,8 @@ class MarkdownViewer {
         jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
       };
       
-      // Generate and download PDF
       await html2pdf().set(pdfOptions).from(tempDiv).save();
       
-      // Clean up
       document.body.removeChild(tempDiv);
       
     } catch (error) {
@@ -140,9 +279,8 @@ class MarkdownViewer {
     }
   }
 
-  // Apply inline styles for PDF generation
+  // Apply inline styles for PDF generation (existing method)
   applyInlineStyles(container) {
-    // Base container styling
     container.style.cssText = `
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6;
@@ -152,7 +290,6 @@ class MarkdownViewer {
       padding: 30px 40px;
     `;
     
-    // Headers
     container.querySelectorAll('h1').forEach(h1 => {
       h1.style.cssText = `
         font-size: 28px;
@@ -184,7 +321,6 @@ class MarkdownViewer {
       `;
     });
     
-    // Text elements
     container.querySelectorAll('p').forEach(p => {
       p.style.cssText = 'margin-bottom: 16px; text-align: justify;';
     });
@@ -201,7 +337,6 @@ class MarkdownViewer {
       li.style.cssText = 'margin-bottom: 8px;';
     });
     
-    // Tables
     container.querySelectorAll('table').forEach(table => {
       table.style.cssText = `
         width: 100%;
@@ -228,7 +363,6 @@ class MarkdownViewer {
         `;
       });
 
-      // Alternating row colors
       table.querySelectorAll('tr:nth-child(even)').forEach(tr => {
         tr.style.backgroundColor = '#fafbfc';
       });
