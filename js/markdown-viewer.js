@@ -29,9 +29,75 @@ class MarkdownViewer {
     });
 
     // Send chat message
-    document.getElementById('chatSend')?.addEventListener('click', () => {
-      this.sendMessage();
-    });
+async sendMessage() {
+  const chatInput = document.getElementById('chatInput');
+  const chatSend = document.getElementById('chatSend');
+  if (!chatInput) return;
+  
+  const message = chatInput.value.trim();
+  if (!message) return;
+  
+  // Add user message
+  this.addMessage('user', message);
+  
+  // Clear input and disable
+  chatInput.value = '';
+  chatInput.disabled = true;
+  if (chatSend) chatSend.disabled = true;
+  
+  // Add thinking indicator
+  this.addThinkingMessage();
+  
+  try {
+    let jobResponse;
+    
+    if (!this.conversationId) {
+      // First message - start new conversation
+      console.log('Starting new conversation for document:', this.currentDocId);
+      jobResponse = await vertesiaAPI.startDocumentConversation({
+        document_id: this.currentDocId,
+        question: message
+      });
+      
+      console.log('Full API response:', jobResponse);
+      
+      // Store conversation ID (might be in different fields)
+      this.conversationId = jobResponse.conversationId || jobResponse.workflowId || jobResponse.id;
+      console.log('Conversation started:', this.conversationId);
+      
+    } else {
+      // Continue existing conversation
+      console.log('Continuing conversation:', this.conversationId);
+      jobResponse = await vertesiaAPI.continueDocumentConversation(
+        this.conversationId,
+        message
+      );
+      
+      console.log('Continue response:', jobResponse);
+    }
+    
+    // Store the runId for polling
+    this.activeChatJob = {
+      runId: jobResponse.runId || jobResponse.id,
+      startTime: Date.now()
+    };
+    
+    console.log('Polling with runId:', this.activeChatJob.runId);
+    
+    // Start polling for result
+    this.startChatPolling();
+    
+  } catch (error) {
+    console.error('Chat error:', error);
+    this.removeThinkingMessage();
+    this.addMessage('assistant', 'Sorry, there was an error processing your question.');
+    
+    // Re-enable input
+    chatInput.disabled = false;
+    if (chatSend) chatSend.disabled = false;
+    chatInput.focus();
+  }
+}
 
     // Enter to send (Shift+Enter for new line)
     document.getElementById('chatInput')?.addEventListener('keydown', (e) => {
@@ -203,13 +269,81 @@ class MarkdownViewer {
         startTime: Date.now()
       };
       
-      // Start polling for result
-      this.startChatPolling();
+   // Start polling for chat result
+startChatPolling() {
+  let pollCount = 0;
+  const maxPolls = 30;
+  
+  this.chatPollTimer = setInterval(async () => {
+    pollCount++;
+    
+    try {
+      console.log(`Polling attempt ${pollCount} for runId:`, this.activeChatJob.runId);
+      
+      const runData = await vertesiaAPI.getChatJobStatus(this.activeChatJob.runId);
+      
+      console.log('Run status:', runData.status);
+      console.log('Full run data:', runData);
+      
+      if (runData.status === 'completed' || runData.status === 'success') {
+        this.removeThinkingMessage();
+        
+        // Extract answer from result field
+        let answer = 'Response received.';
+        
+        if (runData.result) {
+          // Result could be a string or an object
+          if (typeof runData.result === 'string') {
+            answer = runData.result;
+          } else if (runData.result.answer) {
+            answer = runData.result.answer;
+          } else if (runData.result.output) {
+            answer = runData.result.output;
+          } else if (runData.result.response) {
+            answer = runData.result.response;
+          } else {
+            // Just stringify the whole result if we can't find the right field
+            answer = JSON.stringify(runData.result);
+          }
+        }
+        
+        console.log('Extracted answer:', answer);
+        this.addMessage('assistant', answer);
+        
+        this.stopChatPolling();
+        this.reEnableInput();
+        
+      } else if (runData.status === 'failed' || runData.status === 'error') {
+        console.error('Run failed:', runData);
+        this.removeThinkingMessage();
+        this.addMessage('assistant', 'Sorry, there was an error generating the response.');
+        
+        this.stopChatPolling();
+        this.reEnableInput();
+      }
+      
+      if (pollCount >= maxPolls) {
+        console.error('Polling timeout after', maxPolls, 'attempts');
+        this.removeThinkingMessage();
+        this.addMessage('assistant', 'Request timed out. Please try again.');
+        
+        this.stopChatPolling();
+        this.reEnableInput();
+      }
       
     } catch (error) {
-      console.error('Chat error:', error);
-      this.removeThinkingMessage();
-      this.addMessage('assistant', 'Sorry, there was an error processing your question.');
+      console.error('Polling error:', error);
+      
+      if (pollCount >= maxPolls) {
+        this.removeThinkingMessage();
+        this.addMessage('assistant', 'Error checking response status.');
+        
+        this.stopChatPolling();
+        this.reEnableInput();
+      }
+    }
+  }, 2000);
+}
       
       // Re-enable input
       chatInput.disabled = false;
