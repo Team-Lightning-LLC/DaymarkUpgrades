@@ -4,6 +4,7 @@ class MarkdownViewer {
     this.currentContent = '';
     this.currentTitle = '';
     this.currentDocId = null;
+    this.conversationId = null;
     this.chatOpen = false;
     this.chatMessages = [];
     this.activeChatJob = null;
@@ -67,6 +68,7 @@ class MarkdownViewer {
     this.currentContent = markdownContent;
     this.currentTitle = title;
     this.currentDocId = docId;
+    this.conversationId = null;
     this.chatMessages = [];
     this.chatOpen = false;
 
@@ -173,18 +175,28 @@ class MarkdownViewer {
     this.addThinkingMessage();
     
     try {
-      // Build conversation history (exclude the message we just added)
-      const history = this.chatMessages.slice(0, -1).map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
+      let jobResponse;
       
-      // Send to API with conversation history
-      const jobResponse = await vertesiaAPI.chatWithDocument({
-        document_id: this.currentDocId,
-        question: message,
-        conversation_history: history
-      });
+      if (!this.conversationId) {
+        // First message - start new conversation
+        console.log('Starting new conversation for document:', this.currentDocId);
+        jobResponse = await vertesiaAPI.startDocumentConversation({
+          document_id: this.currentDocId,
+          question: message
+        });
+        
+        // Store conversation ID (might be in different fields depending on API response)
+        this.conversationId = jobResponse.conversationId || jobResponse.workflowId || jobResponse.id;
+        console.log('Conversation started:', this.conversationId);
+        
+      } else {
+        // Continue existing conversation
+        console.log('Continuing conversation:', this.conversationId);
+        jobResponse = await vertesiaAPI.continueDocumentConversation(
+          this.conversationId,
+          message
+        );
+      }
       
       this.activeChatJob = {
         runId: jobResponse.runId,
@@ -248,7 +260,10 @@ class MarkdownViewer {
           const result = await vertesiaAPI.getChatJobResult(this.activeChatJob.runId);
           
           this.removeThinkingMessage();
-          this.addMessage('assistant', result.answer || result.output || 'Response received.');
+          
+          // Try different possible response field names
+          const answer = result.answer || result.output || result.result || result.response || 'Response received.';
+          this.addMessage('assistant', answer);
           
           this.stopChatPolling();
           this.reEnableInput();
@@ -361,6 +376,7 @@ class MarkdownViewer {
     
     this.chatOpen = false;
     this.chatMessages = [];
+    this.conversationId = null;
 
     // Close dialog
     if (dialog?.open) {
