@@ -125,25 +125,36 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
-  // Chat with document - Async execution with conversation history
-  async chatWithDocument(data) {
-    return await this.call('/execute/async', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'interaction',
-        interaction: 'DocumentChat',
-        data: {
-          document_id: data.document_id,
-          question: data.question,
-          conversation_history: data.conversation_history || []
-        },
-        config: {
-          environment: CONFIG.ENVIRONMENT_ID,
-          model: CONFIG.MODEL
-        }
-      })
+ // Chat with document - Same pattern as research generation
+async chatWithDocument(data) {
+  // Build the prompt with document_id and conversation history
+  let prompt = `Document ID: ${data.document_id}\n\n`;
+  
+  if (data.conversation_history && data.conversation_history.length > 0) {
+    prompt += 'Previous conversation:\n';
+    data.conversation_history.forEach(msg => {
+      prompt += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
     });
+    prompt += '\n';
   }
+  
+  prompt += `Current question: ${data.question}`;
+  
+  return await this.call('/execute/async', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'conversation',
+      interaction: 'DocumentChat',
+      data: {
+        Task: prompt
+      },
+      config: {
+        environment: CONFIG.ENVIRONMENT_ID,
+        model: CONFIG.MODEL
+      }
+    })
+  });
+}
 
   // Get chat job status
   async getChatJobStatus(runId) {
