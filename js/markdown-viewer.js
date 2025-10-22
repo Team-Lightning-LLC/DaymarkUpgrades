@@ -179,8 +179,6 @@ class MarkdownViewer {
         content: msg.content
       }));
       
-      console.log('Sending chat with history:', history.length, 'messages');
-      
       // Send to API with conversation history
       const jobResponse = await vertesiaAPI.chatWithDocument({
         document_id: this.currentDocId,
@@ -188,10 +186,8 @@ class MarkdownViewer {
         conversation_history: history
       });
       
-      console.log('Chat job response:', jobResponse);
-      
       this.activeChatJob = {
-        runId: jobResponse.runId || jobResponse.id,
+        runId: jobResponse.runId,
         startTime: Date.now()
       };
       
@@ -246,18 +242,13 @@ class MarkdownViewer {
       
       try {
         const status = await vertesiaAPI.getChatJobStatus(this.activeChatJob.runId);
-        console.log('Chat job status:', status);
         
         if (status.status === 'completed' || status.status === 'success') {
           // Get result
           const result = await vertesiaAPI.getChatJobResult(this.activeChatJob.runId);
-          console.log('Chat job result:', result);
           
           this.removeThinkingMessage();
-          
-          // Try different possible response field names
-          const answer = result.answer || result.output || result.result || result.response || 'Response received.';
-          this.addMessage('assistant', answer);
+          this.addMessage('assistant', result.answer || result.output || 'Response received.');
           
           this.stopChatPolling();
           this.reEnableInput();
