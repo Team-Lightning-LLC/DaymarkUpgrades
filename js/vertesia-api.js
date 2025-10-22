@@ -125,36 +125,44 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
- // Chat with document - Same pattern as research generation
-async chatWithDocument(data) {
-  // Build the prompt with document_id and conversation history
-  let prompt = `Document ID: ${data.document_id}\n\n`;
-  
-  if (data.conversation_history && data.conversation_history.length > 0) {
-    prompt += 'Previous conversation:\n';
-    data.conversation_history.forEach(msg => {
-      prompt += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
+  // Start a new conversation with a document
+  async startDocumentConversation(data) {
+    return await this.call('/execute/async', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'conversation',
+        interaction: 'DocumentChat',
+        data: {
+          document_id: data.document_id,
+          question: data.question
+        },
+        config: {
+          environment: CONFIG.ENVIRONMENT_ID,
+          model: CONFIG.MODEL
+        },
+        visibility: 'private',
+        interactive: false
+      })
     });
-    prompt += '\n';
   }
-  
-  prompt += `Current question: ${data.question}`;
-  
-  return await this.call('/execute/async', {
-    method: 'POST',
-    body: JSON.stringify({
-      type: 'conversation',
-      interaction: 'Documentchat',
-      data: {
-        Task: prompt
-      },
-      config: {
-        environment: CONFIG.ENVIRONMENT_ID,
-        model: CONFIG.MODEL
-      }
-    })
-  });
-}
+
+  // Continue existing conversation
+  async continueDocumentConversation(conversationId, question) {
+    return await this.call('/execute/async', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: 'conversation',
+        conversation_id: conversationId,
+        data: {
+          question: question
+        },
+        config: {
+          environment: CONFIG.ENVIRONMENT_ID,
+          model: CONFIG.MODEL
+        }
+      })
+    });
+  }
 
   // Get chat job status
   async getChatJobStatus(runId) {
