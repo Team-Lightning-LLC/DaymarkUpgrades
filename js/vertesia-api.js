@@ -135,7 +135,7 @@ async startDocumentConversation(data) {
       type: 'conversation',
       interaction: 'DocumentChat',
       data: {
-        Task: task
+        task: task
       },
       config: {
         environment: CONFIG.ENVIRONMENT_ID,
@@ -165,7 +165,7 @@ async continueDocumentConversation(conversationId, question) {
       type: 'conversation',
       conversation_id: conversationId,
       data: {
-        task: task  // Capital T
+        task: task 
       },
       config: {
         environment: CONFIG.ENVIRONMENT_ID,
