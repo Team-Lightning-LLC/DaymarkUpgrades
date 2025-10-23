@@ -4,7 +4,6 @@ class MarkdownViewer {
     this.currentContent = '';
     this.currentTitle = '';
     this.currentDocId = null;
-    this.conversationId = null;
     this.chatOpen = false;
     this.chatMessages = [];
     this.activeChatJob = null;
@@ -69,7 +68,6 @@ class MarkdownViewer {
     this.currentContent = markdownContent;
     this.currentTitle = title;
     this.currentDocId = docId;
-    this.conversationId = null;
     this.chatMessages = [];
     this.chatOpen = false;
 
@@ -178,29 +176,23 @@ class MarkdownViewer {
     this.addThinkingMessage();
     
     try {
-      let jobResponse;
+      // Build conversation history (exclude the message we just added)
+      const history = this.chatMessages.slice(0, -1).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
       
-      if (!this.conversationId) {
-        console.log('Starting new conversation for document:', this.currentDocId);
-        jobResponse = await vertesiaAPI.startDocumentConversation({
-          document_id: this.currentDocId,
-          question: message
-        });
-        
-        console.log('Full API response:', jobResponse);
-        
-        this.conversationId = jobResponse.conversationId || jobResponse.workflowId || jobResponse.id;
-        console.log('Conversation started:', this.conversationId);
-        
-      } else {
-        console.log('Continuing conversation:', this.conversationId);
-        jobResponse = await vertesiaAPI.continueDocumentConversation(
-          this.conversationId,
-          message
-        );
-        
-        console.log('Continue response:', jobResponse);
-      }
+      console.log('Sending chat with history length:', history.length);
+      console.log('Document ID:', this.currentDocId);
+      
+      // Single async call with full context
+      const jobResponse = await vertesiaAPI.chatWithDocument({
+        document_id: this.currentDocId,
+        question: message,
+        conversation_history: history
+      });
+      
+      console.log('Chat job response:', jobResponse);
       
       this.activeChatJob = {
         runId: jobResponse.runId || jobResponse.id,
@@ -393,7 +385,6 @@ class MarkdownViewer {
     
     this.chatOpen = false;
     this.chatMessages = [];
-    this.conversationId = null;
 
     if (dialog?.open) {
       dialog.close();
