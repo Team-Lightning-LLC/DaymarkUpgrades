@@ -125,39 +125,55 @@ class VertesiaAPI {
     return await this.createObject(objectData);
   }
 
-  // Chat with document - single async call with conversation history
-  async chatWithDocument(data) {
-    // Build task with full context
-    let task = `Document ID: ${data.document_id}\n\n`;
-    
-    // Add conversation history if exists
-    if (data.conversation_history && data.conversation_history.length > 0) {
-      task += `Previous conversation:\n`;
-      data.conversation_history.forEach(msg => {
-        task += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}\n`;
-      });
-      task += `\n`;
-    }
-    
-    task += `Current question: ${data.question}`;
-    
-    console.log('Sending task to DocumentChat:', task);
-    
-    return await this.call('/execute/async', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: 'interaction',
-        interaction: 'DocumentChat',
-        data: {
-          task: task
-        },
-        config: {
-          environment: CONFIG.ENVIRONMENT_ID,
-          model: CONFIG.MODEL
-        }
-      })
-    });
-  }
+// Start a new conversation with a document
+async startDocumentConversation(data) {
+  const task = `Document ID: ${data.document_id}\n\nQuestion: ${data.question}`;
+  
+  const response = await this.call('/execute/async', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'conversation',
+      interaction: 'DocumentChat',
+      data: {
+        task: task
+      },
+      config: {
+        environment: CONFIG.ENVIRONMENT_ID,
+        model: CONFIG.MODEL
+      },
+      visibility: 'private',
+      interactive: false
+    })
+  });
+  
+  // IMPORTANT: Log this so we can see the structure
+  console.log('=== ASYNC RESPONSE ===');
+  console.log('Full response:', JSON.stringify(response, null, 2));
+  console.log('Keys:', Object.keys(response));
+  console.log('======================');
+  
+  return response;
+}
+
+// Continue existing conversation
+async continueDocumentConversation(conversationId, question) {
+  const task = `Question: ${question}`;
+  
+  return await this.call('/execute/async', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: 'conversation',
+      conversation_id: conversationId,
+      data: {
+        task: task 
+      },
+      config: {
+        environment: CONFIG.ENVIRONMENT_ID,
+        model: CONFIG.MODEL
+      }
+    })
+  });
+}
 
   // Get chat job status
   async getChatJobStatus(runId) {
