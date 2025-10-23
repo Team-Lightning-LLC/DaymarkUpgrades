@@ -127,16 +127,15 @@ class VertesiaAPI {
 
 // Start a new conversation with a document
 async startDocumentConversation(data) {
-  // Build the task prompt
   const task = `Document ID: ${data.document_id}\n\nQuestion: ${data.question}`;
   
-  return await this.call('/execute/async', {
+  const response = await this.call('/execute/async', {
     method: 'POST',
     body: JSON.stringify({
       type: 'conversation',
       interaction: 'DocumentChat',
       data: {
-        task: task  // Capital T, just like research generation
+        Task: task
       },
       config: {
         environment: CONFIG.ENVIRONMENT_ID,
@@ -146,6 +145,14 @@ async startDocumentConversation(data) {
       interactive: false
     })
   });
+  
+  // IMPORTANT: Log this so we can see the structure
+  console.log('=== ASYNC RESPONSE ===');
+  console.log('Full response:', JSON.stringify(response, null, 2));
+  console.log('Keys:', Object.keys(response));
+  console.log('======================');
+  
+  return response;
 }
 
 // Continue existing conversation
